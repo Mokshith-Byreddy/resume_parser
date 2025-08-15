@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+
+{% block title %}Job Results - {{ job.title }} - Resume Screening AI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ job.title }}</h1>
+                <p class="text-gray-600 mt-2">{{ job.company }} • {{ job.location or 'Location not specified' }}</p>
+                <div class="flex items-center mt-2 space-x-4">
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                        {{ job.experience_level.title() }} Level
+                    </span>
+                    <span class="text-sm text-gray-500">
+                        Created {{ job.created_at.strftime('%B %d, %Y') }}
+                    </span>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="exportCSV()" 
+                        class="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <i class="fas fa-download mr-2"></i>
+                    Export CSV
+                </button>
+                <button onclick="uploadMore()" 
+                        class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-upload mr-2"></i>
+                    Upload More
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    {% if resumes %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-blue-100 rounded-lg">
+                    <i class="fas fa-file-pdf text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">{{ resumes|length }}</p>
+                    <p class="text-sm text-gray-500">Total Resumes</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fas fa-star text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(resumes[0].match_score) }}%</p>
+                    <p class="text-sm text-gray-500">Top Match</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-yellow-100 rounded-lg">
+                    <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    {% set avg_score = (resumes | sum(attribute='match_score')) / resumes|length %}
+                    <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(avg_score) }}%</p>
+                    <p class="text-sm text-gray-500">Avg Match</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 bg-purple-100 rounded-lg">
+                    <i class="fas fa-users text-purple-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    {% set qualified = resumes | selectattr('match_score', '>=', 70) | list | length %}
+                    <p class="text-2xl font-bold text-gray-900">{{ qualified }}</p>
+                    <p class="text-sm text-gray-500">Qualified (70%+)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Charts Section -->
+    {% if resumes %}
+    <div class="grid md:grid-cols-2 gap-8 mb-8">
+        <!-- Match Score Distribution -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Match Score Distribution</h3>
+            <div id="scoreChart" style="height: 300px;"></div>
+        </div>
+
+        <!-- Top Skills -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Most Common Skills</h3>
+            <div id="skillsChart" style="height: 300px;"></div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resume Rankings Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">Resume Rankings</h2>
+        </div>
+
+        {% if resumes %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Score</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semantic Score</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key Skills</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Missing Skills</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for resume in resumes %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set rank = loop.index %}
+                            {% if rank <= 3 %}
+                                {% set rank_color = 'text-green-600 bg-green-100' %}
+                            {% elif rank <= 6 %}
+                                {% set rank_color = 'text-yellow-600 bg-yellow-100' %}
+                            {% else %}
+                                {% set rank_color = 'text-red-600 bg-red-100' %}
+                            {% endif %}
+                            <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ rank_color }}">
+                                {{ rank }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">{{ resume.name }}</div>
+                                <div class="text-sm text-gray-500">{{ resume.email or 'No email' }}</div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                {% if resume.match_score >= 80 %}
+                                    {% set score_color = 'text-green-600' %}
+                                {% elif resume.match_score >= 60 %}
+                                    {% set score_color = 'text-yellow-600' %}
+                                {% else %}
+                                    {% set score_color = 'text-red-600' %}
+                                {% endif %}
+                                <div class="text-sm font-bold {{ score_color }}">
+                                    {{ "%.1f"|format(resume.match_score) }}%
+                                </div>
+                                <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                         style="width: {{ resume.match_score }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-purple-600">
+                                {{ "%.1f"|format(resume.semantic_score) }}%
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap gap-1 max-w-xs">
+                                {% for skill in resume.matched_skills[:3] %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    {{ skill }}
+                                </span>
+                                {% endfor %}
+                                {% if resume.matched_skills|length > 3 %}
+                                <span class="text-xs text-gray-500">
+                                    +{{ resume.matched_skills|length - 3 }} more
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap gap-1 max-w-xs">
+                                {% for skill in resume.skill_gaps[:2] %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    {{ skill }}
+                                </span>
+                                {% endfor %}
+                                {% if resume.skill_gaps|length > 2 %}
+                                <span class="text-xs text-gray-500">
+                                    +{{ resume.skill_gaps|length - 2 }} more
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="viewDetails({{ resume.id }})" 
+                                    class="text-blue-600 hover:text-blue-900 flex items-center">
+                                <i class="fas fa-eye mr-1"></i>
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fas fa-chart-bar text-4xl text-gray-400 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Resumes Analyzed Yet</h3>
+            <p class="text-gray-500 mb-6">Upload resume files to see analysis results here.</p>
+            <button onclick="uploadMore()" 
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-upload mr-2"></i>
+                Upload Resumes
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Resume Details Modal -->
+<div id="detailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-900" id="modalTitle">Resume Details</h2>
+            <button onclick="hideDetailsModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-100px)]" id="modalContent">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const jobId = {{ job.id }};
+const resumes = {{ resumes | tojson }};
+
+// Initialize charts
+document.addEventListener('DOMContentLoaded', function() {
+    if (resumes.length > 0) {
+        createScoreChart();
+        createSkillsChart();
+    }
+});
+
+function createScoreChart() {
+    const scores = resumes.map(r => r.match_score);
+    const names = resumes.map(r => r.name);
+    
+    const trace = {
+        x: names,
+        y: scores,
+        type: 'bar',
+        marker: {
+            color: scores.map(score => {
+                if (score >= 80) return '#059669';
+                if (score >= 60) return '#D97706';
+                return '#DC2626';
+            })
+        }
+    };
+    
+    const layout = {
+        title: '',
+        xaxis: { title: 'Candidates' },
+        yaxis: { title: 'Match Score (%)' },
+        margin: { t: 20, b: 100 }
+    };
+    
+    Plotly.newPlot('scoreChart', [trace], layout, {responsive: true});
+}
+
+function createSkillsChart() {
+    // Count all skills
+    const skillCounts = {};
+    resumes.forEach(resume => {
+        resume.skills.forEach(skill => {
+            skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+        });
+    });
+    
+    // Get top 10 skills
+    const sortedSkills = Object.entries(skillCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 10);
+    
+    const trace = {
+        x: sortedSkills.map(([skill]) => skill),
+        y: sortedSkills.map(([, count]) => count),
+        type: 'bar',
+        marker: { color: '#2563EB' }
+    };
+    
+    const layout = {
+        title: '',
+        xaxis: { title: 'Skills' },
+        yaxis: { title: 'Frequency' },
+        margin: { t: 20, b: 100 }
+    };
+    
+    Plotly.newPlot('skillsChart', [trace], layout, {responsive: true});
+}
+
+async function viewDetails(resumeId) {
+    try {
+        const response = await fetch(`/resume_details/${resumeId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            showNotification('Error loading resume details', 'error');
+            return;
+        }
+        
+        document.getElementById('modalTitle').textContent = `${data.resume.name} - Resume Analysis`;
+        
+        const content = `
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Left Panel -->
+                <div>
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Contact Information</h3>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <p><strong>Email:</strong> ${data.resume.email || 'Not provided'}</p>
+                            <p><strong>Phone:</strong> ${data.resume.phone || 'Not provided'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Match Scores</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span>Overall Match:</span>
+                                <span class="text-2xl font-bold text-blue-600">${data.resume.match_score.toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>Semantic Match:</span>
+                                <span class="text-xl font-bold text-purple-600">${data.resume.semantic_score.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Experience</h3>
+                        <div class="space-y-2">
+                            ${data.resume.experience.map(exp => `
+                                <p class="text-sm text-gray-700 bg-gray-50 p-2 rounded">${exp}</p>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Education</h3>
+                        <div class="space-y-2">
+                            ${data.resume.education.map(edu => `
+                                <p class="text-sm text-gray-700 bg-gray-50 p-2 rounded">${edu}</p>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Panel -->
+                <div>
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-green-700 mb-3">Matched Skills (${data.resume.matched_skills.length})</h3>
+                        <div class="flex flex-wrap gap-2">
+                            ${data.resume.matched_skills.map(skill => `
+                                <span class="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">${skill}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-red-700 mb-3">Missing Skills (${data.resume.skill_gaps.length})</h3>
+                        <div class="flex flex-wrap gap-2">
+                            ${data.resume.skill_gaps.map(skill => `
+                                <span class="px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full">${skill}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Job Recommendations</h3>
+                        <div class="space-y-3">
+                            ${data.recommendations.slice(0, 3).map(rec => `
+                                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h4 class="font-medium text-gray-900">${rec.job_title}</h4>
+                                        <span class="text-sm font-bold text-green-600">${rec.match_score}%</span>
+                                    </div>
+                                    <p class="text-xs text-gray-600">${rec.reasons.slice(0, 2).join(', ')}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">AI Feedback</h3>
+                        
+                        <div class="mb-4">
+                            <h4 class="font-medium text-green-700 mb-2">Strengths</h4>
+                            <ul class="space-y-1">
+                                ${data.feedback.strengths.map(strength => `
+                                    <li class="text-sm text-gray-700 flex items-start">
+                                        <div class="w-2 h-2 bg-green-500 rounded-full mt-2 mr-2 flex-shrink-0"></div>
+                                        ${strength}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h4 class="font-medium text-orange-700 mb-2">Improvements</h4>
+                            <ul class="space-y-1">
+                                ${data.feedback.improvements.map(improvement => `
+                                    <li class="text-sm text-gray-700 flex items-start">
+                                        <div class="w-2 h-2 bg-orange-500 rounded-full mt-2 mr-2 flex-shrink-0"></div>
+                                        ${improvement}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium text-blue-700 mb-2">Recommendations</h4>
+                            <ul class="space-y-1">
+                                ${data.feedback.recommendations.map(rec => `
+                                    <li class="text-sm text-gray-700 flex items-start">
+                                        <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></div>
+                                        ${rec}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('modalContent').innerHTML = content;
+        document.getElementById('detailsModal').classList.remove('hidden');
+        document.getElementById('detailsModal').classList.add('flex');
+        
+    } catch (error) {
+        showNotification('Error loading resume details', 'error');
+    }
+}
+
+function hideDetailsModal() {
+    document.getElementById('detailsModal').classList.add('hidden');
+    document.getElementById('detailsModal').classList.remove('flex');
+}
+
+function exportCSV() {
+    window.location.href = `/export_csv/${jobId}`;
+}
+
+function uploadMore() {
+    window.location.href = '/dashboard';
+}
+</script>
+{% endblock %}

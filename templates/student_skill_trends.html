@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Skill Trends - Resume Screening AI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Market Skill Trends</h1>
+        <p class="text-gray-600 mt-2">Analyze market demand for skills and identify growth opportunities</p>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+        <p class="text-gray-600">Analyzing market trends...</p>
+    </div>
+
+    <!-- Content Container -->
+    <div id="trendsContent" class="hidden">
+        <!-- Market Overview -->
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-lg">
+                        <i class="fas fa-briefcase text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-2xl font-bold text-gray-900" id="totalJobs">0</p>
+                        <p class="text-sm text-gray-500">Jobs Analyzed</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-lg">
+                        <i class="fas fa-cogs text-green-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-2xl font-bold text-gray-900" id="uniqueSkills">0</p>
+                        <p class="text-sm text-gray-500">Unique Skills</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-lg">
+                        <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-2xl font-bold text-gray-900" id="marketCoverage">0%</p>
+                        <p class="text-sm text-gray-500">Your Market Coverage</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trending Skills Chart -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Top Trending Skills</h2>
+            <div id="trendingChart" style="height: 400px;"></div>
+        </div>
+
+        <!-- Your Skills vs Market -->
+        <div class="grid md:grid-cols-2 gap-8 mb-8">
+            <!-- Skills You Have -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-green-700 mb-4">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    Skills You Have in Demand
+                </h2>
+                <div id="skillsYouHave" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Skills You're Missing -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-red-700 mb-4">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    High-Demand Skills You're Missing
+                </h2>
+                <div id="skillsYouMissing" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Skill Demand Heatmap -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Skill Demand Heatmap</h2>
+            <div id="heatmapChart" style="height: 500px;"></div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-lightbulb mr-2"></i>
+                Recommended Actions
+            </h2>
+            <div id="actionItems" class="grid md:grid-cols-2 gap-4">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadSkillTrends();
+});
+
+async function loadSkillTrends() {
+    try {
+        const response = await fetch('/student_skill_trends');
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('loadingState').innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                    <p class="text-gray-600">${data.error}</p>
+                    <p class="text-sm text-gray-500 mt-2">Please upload your resume first to see personalized trends.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Hide loading and show content
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('trendsContent').classList.remove('hidden');
+        
+        // Update overview stats
+        document.getElementById('totalJobs').textContent = data.market_analysis.total_jobs_analyzed;
+        document.getElementById('uniqueSkills').textContent = data.market_analysis.unique_skills_in_market;
+        document.getElementById('marketCoverage').textContent = Math.round(data.market_analysis.student_market_coverage) + '%';
+        
+        // Create trending skills chart
+        const trendingSkills = data.trending_skills.slice(0, 15);
+        const skillNames = trendingSkills.map(item => item[0]);
+        const skillDemands = trendingSkills.map(item => item[1]);
+        
+        const trendingData = [{
+            x: skillNames,
+            y: skillDemands,
+            type: 'bar',
+            marker: {
+                color: skillDemands.map((demand, index) => {
+                    // Color based on whether student has the skill
+                    const hasSkill = data.student_has.some(s => s.skill === skillNames[index]);
+                    return hasSkill ? '#10B981' : '#EF4444';
+                })
+            },
+            text: skillNames.map((skill, index) => {
+                const hasSkill = data.student_has.some(s => s.skill === skill);
+                return hasSkill ? 'You have this!' : 'Missing';
+            }),
+            textposition: 'outside'
+        }];
+        
+        const trendingLayout = {
+            title: 'Top 15 Most Demanded Skills',
+            xaxis: { 
+                title: 'Skills',
+                tickangle: -45
+            },
+            yaxis: { title: 'Number of Job Postings' },
+            margin: { t: 50, b: 150, l: 50, r: 50 }
+        };
+        
+        Plotly.newPlot('trendingChart', trendingData, trendingLayout);
+        
+        // Populate skills you have
+        const skillsYouHaveContainer = document.getElementById('skillsYouHave');
+        if (data.student_has.length > 0) {
+            skillsYouHaveContainer.innerHTML = data.student_has.map(item => `
+                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <div>
+                        <h4 class="font-semibold text-green-800">${item.skill}</h4>
+                        <p class="text-sm text-green-600">Your skill: "${item.match.candidate_skill}" (${(item.match.similarity * 100).toFixed(1)}% match)</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-2 py-1 bg-green-200 text-green-800 rounded text-sm font-medium">
+                            ${item.demand} jobs
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            skillsYouHaveContainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-search text-3xl mb-2"></i>
+                    <p>No matching skills found in current market trends</p>
+                </div>
+            `;
+        }
+        
+        // Populate skills you're missing
+        const skillsYouMissingContainer = document.getElementById('skillsYouMissing');
+        if (data.student_missing.length > 0) {
+            skillsYouMissingContainer.innerHTML = data.student_missing.map(item => `
+                <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                    <div>
+                        <h4 class="font-semibold text-red-800">${item.skill}</h4>
+                        <p class="text-sm text-red-600">High market demand skill</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-2 py-1 bg-red-200 text-red-800 rounded text-sm font-medium">
+                            ${item.demand} jobs
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            skillsYouMissingContainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-trophy text-3xl mb-2"></i>
+                    <p>Great! You have all the trending skills</p>
+                </div>
+            `;
+        }
+        
+        // Create heatmap
+        createSkillHeatmap(data.trending_skills);
+        
+        // Generate action items
+        generateActionItems(data);
+        
+    } catch (error) {
+        document.getElementById('loadingState').innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                <p class="text-gray-600">Error loading skill trends</p>
+            </div>
+        `;
+    }
+}
+
+function createSkillHeatmap(trendingSkills) {
+    // Group skills by categories for heatmap
+    const categories = {
+        'Programming': ['python', 'java', 'javascript', 'typescript', 'c++', 'c#'],
+        'Web Dev': ['react', 'angular', 'vue', 'node.js', 'html', 'css'],
+        'Data Science': ['machine learning', 'data science', 'pandas', 'numpy', 'tensorflow'],
+        'Cloud': ['aws', 'azure', 'docker', 'kubernetes', 'jenkins'],
+        'Database': ['sql', 'mongodb', 'postgresql', 'mysql', 'redis']
+    };
+    
+    const heatmapData = [];
+    const categoryNames = Object.keys(categories);
+    
+    categoryNames.forEach(category => {
+        const categorySkills = categories[category];
+        const row = categorySkills.map(skill => {
+            const found = trendingSkills.find(item => item[0].toLowerCase().includes(skill.toLowerCase()));
+            return found ? found[1] : 0;
+        });
+        heatmapData.push(row);
+    });
+    
+    const heatmapTrace = [{
+        z: heatmapData,
+        x: categories[categoryNames[0]], // Use first category skills as x-axis
+        y: categoryNames,
+        type: 'heatmap',
+        colorscale: 'Viridis',
+        showscale: true
+    }];
+    
+    const heatmapLayout = {
+        title: 'Skill Demand by Category',
+        xaxis: { title: 'Skills' },
+        yaxis: { title: 'Categories' },
+        margin: { t: 50, b: 100, l: 100, r: 50 }
+    };
+    
+    Plotly.newPlot('heatmapChart', heatmapTrace, heatmapLayout);
+}
+
+function generateActionItems(data) {
+    const actionItems = [];
+    
+    // Priority actions based on missing high-demand skills
+    if (data.student_missing.length > 0) {
+        const topMissing = data.student_missing.slice(0, 3);
+        actionItems.push({
+            title: 'Learn High-Demand Skills',
+            description: `Focus on: ${topMissing.map(s => s.skill).join(', ')}`,
+            icon: 'fas fa-graduation-cap',
+            priority: 'high'
+        });
+    }
+    
+    // Leverage existing skills
+    if (data.student_has.length > 0) {
+        actionItems.push({
+            title: 'Leverage Your Strengths',
+            description: `Highlight your ${data.student_has.length} in-demand skills in applications`,
+            icon: 'fas fa-star',
+            priority: 'medium'
+        });
+    }
+    
+    // Market coverage improvement
+    if (data.market_analysis.student_market_coverage < 50) {
+        actionItems.push({
+            title: 'Improve Market Coverage',
+            description: 'Your current coverage is low. Consider diversifying your skillset',
+            icon: 'fas fa-chart-line',
+            priority: 'high'
+        });
+    }
+    
+    // Networking suggestion
+    actionItems.push({
+        title: 'Network in Growing Fields',
+        description: 'Connect with professionals in high-demand skill areas',
+        icon: 'fas fa-users',
+        priority: 'medium'
+    });
+    
+    const actionItemsContainer = document.getElementById('actionItems');
+    actionItemsContainer.innerHTML = actionItems.map(item => `
+        <div class="bg-white bg-opacity-20 rounded-lg p-4">
+            <div class="flex items-start">
+                <i class="${item.icon} text-2xl mr-3 mt-1"></i>
+                <div>
+                    <h4 class="font-semibold mb-2">${item.title}</h4>
+                    <p class="text-sm opacity-90">${item.description}</p>
+                    <span class="inline-block mt-2 px-2 py-1 bg-white bg-opacity-30 rounded text-xs">
+                        ${item.priority.toUpperCase()} PRIORITY
+                    </span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %}

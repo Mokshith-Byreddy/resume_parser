@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Create Job Description - Resume Screening AI{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Create Job Description</h1>
+        <p class="text-gray-600 mt-2">Define the job requirements to analyze resumes against</p>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form id="jobForm" class="space-y-6">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label for="title" class="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
+                    <input type="text" id="title" name="title" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., Senior Software Engineer">
+                </div>
+
+                <div>
+                    <label for="company" class="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                    <input type="text" id="company" name="company" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Company name">
+                </div>
+
+                <div>
+                    <label for="experience_level" class="block text-sm font-medium text-gray-700 mb-2">Experience Level</label>
+                    <select id="experience_level" name="experience_level"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="entry">Entry Level (0-2 years)</option>
+                        <option value="mid" selected>Mid Level (3-5 years)</option>
+                        <option value="senior">Senior Level (5+ years)</option>
+                        <option value="lead">Lead/Principal (8+ years)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="location" class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input type="text" id="location" name="location"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., San Francisco, CA / Remote">
+                </div>
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Job Description</label>
+                <textarea id="description" name="description" rows="8" required
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Paste the full job description here..."></textarea>
+                <button type="button" onclick="extractSkills()" 
+                        class="mt-2 flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
+                    <i class="fas fa-magic mr-1"></i>
+                    Auto-Extract Skills
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Required Skills (<span id="skillCount">0</span>)
+                </label>
+                <div id="skillsContainer" class="flex flex-wrap gap-2 mb-3 min-h-[40px] p-2 border border-gray-200 rounded-lg">
+                    <!-- Skills will be added here -->
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="skillInput" 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Add a skill and press Enter">
+                    <button type="button" onclick="addSkill()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Add
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <a href="{{ url_for('dashboard') }}" 
+                   class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                    Cancel
+                </a>
+                <button type="submit" id="saveBtn"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save mr-2"></i>
+                    Save Job Description
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let skills = [];
+
+function updateSkillsDisplay() {
+    const container = document.getElementById('skillsContainer');
+    const countElement = document.getElementById('skillCount');
+    
+    container.innerHTML = '';
+    countElement.textContent = skills.length;
+    
+    skills.forEach((skill, index) => {
+        const skillElement = document.createElement('span');
+        skillElement.className = 'inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full skill-tag';
+        skillElement.innerHTML = `
+            ${skill}
+            <button type="button" onclick="removeSkill(${index})" class="ml-2 text-blue-600 hover:text-red-500">
+                ×
+            </button>
+        `;
+        container.appendChild(skillElement);
+    });
+}
+
+function addSkill() {
+    const input = document.getElementById('skillInput');
+    const skill = input.value.trim();
+    
+    if (skill && !skills.includes(skill)) {
+        skills.push(skill);
+        updateSkillsDisplay();
+        input.value = '';
+    }
+}
+
+function removeSkill(index) {
+    skills.splice(index, 1);
+    updateSkillsDisplay();
+}
+
+function extractSkills() {
+    const description = document.getElementById('description').value;
+    
+    if (!description.trim()) {
+        showNotification('Please enter a job description first', 'error');
+        return;
+    }
+    
+    // Simulate skill extraction (in production, this would call the backend)
+    const commonSkills = [
+        'javascript', 'python', 'java', 'react', 'angular', 'vue', 'node.js',
+        'html', 'css', 'typescript', 'sql', 'mongodb', 'postgresql', 'mysql',
+        'aws', 'azure', 'docker', 'kubernetes', 'git', 'agile', 'scrum',
+        'machine learning', 'ai', 'data science', 'analytics', 'tableau',
+        'powerbi', 'excel', 'project management', 'leadership', 'communication'
+    ];
+    
+    const descriptionLower = description.toLowerCase();
+    const extractedSkills = commonSkills.filter(skill => 
+        descriptionLower.includes(skill.toLowerCase())
+    );
+    
+    // Add extracted skills that aren't already in the list
+    extractedSkills.forEach(skill => {
+        if (!skills.includes(skill)) {
+            skills.push(skill);
+        }
+    });
+    
+    updateSkillsDisplay();
+    showNotification(`Extracted ${extractedSkills.length} skills from job description`);
+}
+
+// Add skill on Enter key press
+document.getElementById('skillInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addSkill();
+    }
+});
+
+// Form submission
+document.getElementById('jobForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        title: document.getElementById('title').value,
+        company: document.getElementById('company').value,
+        description: document.getElementById('description').value,
+        experience_level: document.getElementById('experience_level').value,
+        location: document.getElementById('location').value,
+        required_skills: skills
+    };
+    
+    if (skills.length === 0) {
+        showNotification('Please add at least one required skill', 'error');
+        return;
+    }
+    
+    showLoading('saveBtn');
+    
+    try {
+        const response = await fetch('/create_job', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Job description created successfully!');
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1500);
+        } else {
+            showNotification('Error creating job description', 'error');
+        }
+    } catch (error) {
+        showNotification('Error creating job description', 'error');
+    } finally {
+        hideLoading('saveBtn', '<i class="fas fa-save mr-2"></i>Save Job Description');
+    }
+});
+
+// Initialize
+updateSkillsDisplay();
+</script>
+{% endblock %}

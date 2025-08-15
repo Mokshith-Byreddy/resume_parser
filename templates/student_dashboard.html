@@ -1,0 +1,672 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Resume Screening AI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Student Dashboard</h1>
+        <p class="text-gray-600 mt-2">Analyze your skills, get job recommendations, and track your career progress</p>
+    </div>
+
+    <!-- Profile Status -->
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 mb-8 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold mb-2">Welcome, {{ current_user.full_name or current_user.username }}!</h2>
+                <p class="text-blue-100">
+                    {% if student_profile.resume_filename %}
+                        Your profile is complete. Ready to explore opportunities!
+                    {% else %}
+                        Complete your profile to get personalized job recommendations.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-right">
+                {% if student_profile.resume_filename %}
+                    <div class="bg-green-500 bg-opacity-20 rounded-full p-3 mb-2">
+                        <i class="fas fa-check-circle text-2xl"></i>
+                    </div>
+                    <p class="text-sm">Profile Complete</p>
+                {% else %}
+                    <div class="bg-yellow-500 bg-opacity-20 rounded-full p-3 mb-2">
+                        <i class="fas fa-exclamation-triangle text-2xl"></i>
+                    </div>
+                    <p class="text-sm">Profile Incomplete</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-blue-100 rounded-lg">
+                    <i class="fas fa-user text-blue-600 text-xl"></i>
+                </div>
+                <h3 class="ml-3 text-lg font-semibold text-gray-900">My Profile</h3>
+            </div>
+            <p class="text-gray-600 mb-4">Manage your personal information and career preferences.</p>
+            <a href="{{ url_for('student_profile') }}" 
+               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-edit mr-2"></i>
+                Edit Profile
+            </a>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fas fa-file-upload text-green-600 text-xl"></i>
+                </div>
+                <h3 class="ml-3 text-lg font-semibold text-gray-900">Upload Resume</h3>
+            </div>
+            <p class="text-gray-600 mb-4">Upload your resume for AI-powered skill analysis.</p>
+            <button onclick="showResumeUploadModal()" 
+                    class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <i class="fas fa-upload mr-2"></i>
+                Upload Resume
+            </button>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-purple-100 rounded-lg">
+                    <i class="fas fa-chart-bar text-purple-600 text-xl"></i>
+                </div>
+                <h3 class="ml-3 text-lg font-semibold text-gray-900">Skill Analysis</h3>
+            </div>
+            <p class="text-gray-600 mb-4">View detailed analysis of your skills and gaps.</p>
+            <div class="flex space-x-2">
+                <button onclick="showSkillAnalysis()" 
+                        class="inline-flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                    <i class="fas fa-analytics mr-2"></i>
+                    Basic Analysis
+                </button>
+                <button onclick="showBERTAnalysis()" 
+                        class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                    <i class="fas fa-brain mr-2"></i>
+                    AI Analysis
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skills Overview -->
+    {% if student_profile.skills %}
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Your Skills</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for skill in (student_profile.skills | from_json)[:15] %}
+            <span class="skill-tag px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                {{ skill }}
+            </span>
+            {% endfor %}
+            {% if (student_profile.skills | from_json) | length > 15 %}
+            <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                +{{ (student_profile.skills | from_json) | length - 15 }} more
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Job Recommendations -->
+    {% if recommendations %}
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Recommended Jobs for You</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for rec in recommendations[:4] %}
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-semibold text-gray-900">{{ rec.job_title }}</h3>
+                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                        {{ rec.match_score }}% match
+                    </span>
+                </div>
+                <p class="text-gray-600 text-sm mb-2">{{ rec.salary_range }}</p>
+                <div class="flex flex-wrap gap-1">
+                    {% for skill in rec.matched_skills[:3] %}
+                    <span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Available Jobs -->
+    {% if available_jobs %}
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Available Opportunities</h2>
+        <div class="space-y-4">
+            {% for job in available_jobs[:5] %}
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-semibold text-gray-900">{{ job.title }}</h3>
+                        <p class="text-gray-600">{{ job.company }}</p>
+                        <p class="text-sm text-gray-500 mt-1">{{ job.experience_level.title() }} Level</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm text-gray-500">{{ job.created_at.strftime('%Y-%m-%d') }}</span>
+                        {% if student_profile.skills %}
+                        <button onclick="checkJobMatch({{ job.id }})" 
+                                class="block mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                            Check Match
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Resume Upload Modal -->
+<div id="resumeUploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Upload Your Resume</h3>
+            <button onclick="hideResumeUploadModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="resumeUploadForm" enctype="multipart/form-data">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Resume (PDF)</label>
+                <input type="file" id="resumeFile" accept=".pdf" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Upload your resume in PDF format for analysis</p>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="hideResumeUploadModal()" 
+                        class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" id="resumeUploadBtn"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Upload & Analyze
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Skill Analysis Modal -->
+<div id="skillAnalysisModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Skill Analysis & Job Matching</h3>
+            <button onclick="hideSkillAnalysisModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div id="skillAnalysisContent">
+            <!-- Content will be loaded dynamically -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showResumeUploadModal() {
+    document.getElementById('resumeUploadModal').classList.remove('hidden');
+    document.getElementById('resumeUploadModal').classList.add('flex');
+}
+
+function hideResumeUploadModal() {
+    document.getElementById('resumeUploadModal').classList.add('hidden');
+    document.getElementById('resumeUploadModal').classList.remove('flex');
+}
+
+function showSkillAnalysisModal() {
+    document.getElementById('skillAnalysisModal').classList.remove('hidden');
+    document.getElementById('skillAnalysisModal').classList.add('flex');
+}
+
+function hideSkillAnalysisModal() {
+    document.getElementById('skillAnalysisModal').classList.add('hidden');
+    document.getElementById('skillAnalysisModal').classList.remove('flex');
+}
+
+document.getElementById('resumeUploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const file = document.getElementById('resumeFile').files[0];
+    
+    if (!file) {
+        showNotification('Please select a resume file', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('resume', file);
+    
+    showLoading('resumeUploadBtn');
+    
+    try {
+        const response = await fetch('/upload_student_resume', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Resume uploaded and analyzed successfully!');
+            hideResumeUploadModal();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification(result.error || 'Error uploading resume', 'error');
+        }
+    } catch (error) {
+        showNotification('Error uploading resume', 'error');
+    } finally {
+        hideLoading('resumeUploadBtn', 'Upload & Analyze');
+    }
+});
+
+async function showSkillAnalysis() {
+    showSkillAnalysisModal();
+    
+    try {
+        const response = await fetch('/student_skill_analysis');
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('skillAnalysisContent').innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                    <p class="text-gray-600">${data.error}</p>
+                    <p class="text-sm text-gray-500 mt-2">Please upload your resume first to see skill analysis.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create skill analysis content
+        let content = `
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">Your Skills (${data.student_skills.length})</h4>
+                <div class="flex flex-wrap gap-2">
+        `;
+        
+        data.student_skills.forEach(skill => {
+            content += `<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">${skill}</span>`;
+        });
+        
+        content += `
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">Job Matching Analysis</h4>
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+        `;
+        
+        data.job_matches.forEach(match => {
+            content += `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h5 class="font-semibold">${match.job_title}</h5>
+                            <p class="text-gray-600 text-sm">${match.company}</p>
+                        </div>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                            ${match.match_score}% match
+                        </span>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-4 mt-3">
+                        <div>
+                            <p class="text-sm font-medium text-green-700 mb-1">Matched Skills:</p>
+                            <div class="flex flex-wrap gap-1">
+            `;
+            
+            match.matched_skills.forEach(skill => {
+                content += `<span class="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">${skill}</span>`;
+            });
+            
+            content += `
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-red-700 mb-1">Missing Skills:</p>
+                            <div class="flex flex-wrap gap-1">
+            `;
+            
+            match.missing_skills.forEach(skill => {
+                content += `<span class="px-2 py-1 bg-red-50 text-red-700 rounded text-xs">${skill}</span>`;
+            });
+            
+            content += `
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        content += `
+                </div>
+            </div>
+            
+            <div id="skillChart" style="height: 400px;"></div>
+        `;
+        
+        document.getElementById('skillAnalysisContent').innerHTML = content;
+        
+        // Create skill category chart
+        const categories = data.skill_categories;
+        const categoryNames = Object.keys(categories);
+        const categoryCounts = categoryNames.map(cat => categories[cat].length);
+        
+        const chartData = [{
+            x: categoryNames,
+            y: categoryCounts,
+            type: 'bar',
+            marker: {
+                color: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#6B7280']
+            }
+        }];
+        
+        const layout = {
+            title: 'Your Skills by Category',
+            xaxis: { title: 'Skill Categories' },
+            yaxis: { title: 'Number of Skills' },
+            margin: { t: 50, b: 50, l: 50, r: 50 }
+        };
+        
+        Plotly.newPlot('skillChart', chartData, layout);
+        
+    } catch (error) {
+        document.getElementById('skillAnalysisContent').innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                <p class="text-gray-600">Error loading skill analysis</p>
+            </div>
+        `;
+    }
+}
+
+async function showBERTAnalysis() {
+    showSkillAnalysisModal();
+    
+    try {
+        const response = await fetch('/student_bert_analysis');
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('skillAnalysisContent').innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                    <p class="text-gray-600">${data.error}</p>
+                    <p class="text-sm text-gray-500 mt-2">Please upload your resume first to see BERT analysis.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create BERT analysis content
+        let content = `
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">AI-Powered Skill Analysis</h4>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-blue-800 mb-2">Total Skills Analyzed</h5>
+                        <p class="text-2xl font-bold text-blue-600">${data.total_skills}</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-green-800 mb-2">Skill Categories</h5>
+                        <p class="text-2xl font-bold text-green-600">${Object.keys(data.semantic_categories).length}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">Semantic Skill Categories</h4>
+                <div class="grid md:grid-cols-2 gap-4">
+        `;
+        
+        Object.entries(data.semantic_categories).forEach(([category, skills]) => {
+            content += `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h5 class="font-semibold text-gray-800 mb-2">${category} (${skills.length})</h5>
+                    <div class="flex flex-wrap gap-1">
+            `;
+            skills.forEach(skill => {
+                content += `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${skill}</span>`;
+            });
+            content += `
+                    </div>
+                </div>
+            `;
+        });
+        
+        content += `
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">Skill Strength Analysis</h4>
+                <div id="strengthChart" style="height: 300px;"></div>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">Skill Clusters</h4>
+                <div id="clusterChart" style="height: 400px;"></div>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-lg font-semibold mb-3">AI Recommendations</h4>
+                <div class="space-y-3">
+        `;
+        
+        data.recommendations.forEach(rec => {
+            const priorityColor = rec.priority === 'high' ? 'red' : rec.priority === 'medium' ? 'yellow' : 'blue';
+            content += `
+                <div class="border border-gray-200 rounded-lg p-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h5 class="font-semibold">${rec.skill}</h5>
+                            <p class="text-sm text-gray-600">${rec.reason}</p>
+                        </div>
+                        <span class="px-2 py-1 bg-${priorityColor}-100 text-${priorityColor}-800 rounded text-xs font-medium">
+                            ${rec.priority} priority
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        content += `
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('skillAnalysisContent').innerHTML = content;
+        
+        // Create strength scores chart
+        const categories = Object.keys(data.strength_scores);
+        const scores = Object.values(data.strength_scores);
+        
+        const strengthData = [{
+            x: categories,
+            y: scores,
+            type: 'bar',
+            marker: {
+                color: scores.map(score => score > 80 ? '#10B981' : score > 60 ? '#F59E0B' : '#EF4444')
+            }
+        }];
+        
+        const strengthLayout = {
+            title: 'Skill Strength by Category',
+            xaxis: { title: 'Categories' },
+            yaxis: { title: 'Strength Score (0-100)', range: [0, 100] },
+            margin: { t: 50, b: 100, l: 50, r: 50 }
+        };
+        
+        Plotly.newPlot('strengthChart', strengthData, strengthLayout);
+        
+        // Create cluster visualization
+        if (data.skill_clusters.clusters && data.skill_clusters.clusters.length > 0) {
+            const clusterData = data.skill_clusters.clusters.map((cluster, index) => ({
+                x: cluster.skills,
+                y: cluster.skills.map(() => cluster.size),
+                type: 'scatter',
+                mode: 'markers+text',
+                text: cluster.skills,
+                textposition: 'middle center',
+                name: `Cluster ${cluster.id + 1}`,
+                marker: {
+                    size: cluster.skills.map(() => Math.max(cluster.size * 5, 10)),
+                    opacity: 0.7
+                }
+            }));
+            
+            const clusterLayout = {
+                title: 'Skill Clusters (Semantic Grouping)',
+                xaxis: { title: 'Skills' },
+                yaxis: { title: 'Cluster Size' },
+                margin: { t: 50, b: 100, l: 50, r: 50 },
+                showlegend: true
+            };
+            
+            Plotly.newPlot('clusterChart', clusterData, clusterLayout);
+        }
+        
+    } catch (error) {
+        document.getElementById('skillAnalysisContent').innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                <p class="text-gray-600">Error loading BERT analysis</p>
+            </div>
+        `;
+    }
+}
+
+async function checkJobMatch(jobId) {
+    try {
+        const response = await fetch(`/student_job_semantic_match/${jobId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            showNotification(data.error, 'error');
+            return;
+        }
+        
+        // Show detailed job match modal
+        showJobMatchModal(data);
+        
+    } catch (error) {
+        showNotification('Error analyzing job match', 'error');
+    }
+}
+
+function showJobMatchModal(data) {
+    // Create and show job match modal
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.id = 'jobMatchModal';
+    
+    let matchedSkillsHtml = '';
+    data.semantic_analysis.matched.forEach(match => {
+        matchedSkillsHtml += `
+            <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                <span class="text-green-700">${match.job_skill}</span>
+                <span class="text-sm text-gray-500">matches "${match.candidate_skill}" (${(match.similarity * 100).toFixed(1)}%)</span>
+            </div>
+        `;
+    });
+    
+    let missingSkillsHtml = '';
+    data.semantic_analysis.missing.forEach(skill => {
+        missingSkillsHtml += `<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-sm mr-2 mb-2 inline-block">${skill}</span>`;
+    });
+    
+    let recommendationsHtml = '';
+    data.recommendations.forEach(rec => {
+        recommendationsHtml += `
+            <div class="bg-blue-50 p-3 rounded-lg mb-2">
+                <h6 class="font-semibold text-blue-800">${rec.skill}</h6>
+                <p class="text-sm text-blue-600">${rec.reason}</p>
+            </div>
+        `;
+    });
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Job Match Analysis</h3>
+                <button onclick="closeJobMatchModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <h4 class="text-xl font-bold text-gray-800">${data.job.title}</h4>
+                <p class="text-gray-600">${data.job.company} • ${data.job.experience_level} Level</p>
+                <div class="mt-2">
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-lg font-semibold">
+                        ${data.match_percentage}% Match
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h5 class="font-semibold text-green-700 mb-3">Matched Skills (${data.semantic_analysis.matched.length})</h5>
+                    <div class="max-h-64 overflow-y-auto">
+                        ${matchedSkillsHtml || '<p class="text-gray-500">No matched skills found</p>'}
+                    </div>
+                </div>
+                
+                <div>
+                    <h5 class="font-semibold text-red-700 mb-3">Missing Skills (${data.semantic_analysis.missing.length})</h5>
+                    <div class="max-h-64 overflow-y-auto">
+                        ${missingSkillsHtml || '<p class="text-gray-500">No missing skills</p>'}
+                    </div>
+                </div>
+            </div>
+            
+            ${data.recommendations.length > 0 ? `
+            <div class="mt-6">
+                <h5 class="font-semibold text-blue-700 mb-3">Skill Development Recommendations</h5>
+                <div class="max-h-48 overflow-y-auto">
+                    ${recommendationsHtml}
+                </div>
+            </div>
+            ` : ''}
+            
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeJobMatchModal()" 
+                        class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closeJobMatchModal() {
+    const modal = document.getElementById('jobMatchModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+</script>
+{% endblock %}

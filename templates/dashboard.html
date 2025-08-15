@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Resume Screening AI{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-gray-600 mt-2">Manage your job descriptions and analyze resumes with AI</p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center">
+                <div class="p-3 bg-blue-100 rounded-lg">
+                    <i class="fas fa-plus text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">{{ job_descriptions|length }}</p>
+                    <p class="text-sm text-gray-500">Job Descriptions</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center">
+                <div class="p-3 bg-green-100 rounded-lg">
+                    <i class="fas fa-file-pdf text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">0</p>
+                    <p class="text-sm text-gray-500">Resumes Analyzed</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center">
+                <div class="p-3 bg-purple-100 rounded-lg">
+                    <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">95%</p>
+                    <p class="text-sm text-gray-500">Avg Match Score</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md card-hover">
+            <div class="flex items-center">
+                <div class="p-3 bg-yellow-100 rounded-lg">
+                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-2xl font-bold text-gray-900">2.5s</p>
+                    <p class="text-sm text-gray-500">Avg Analysis Time</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="grid md:grid-cols-2 gap-8 mb-8">
+        <!-- Create Job Description -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Create New Job Description</h2>
+            <p class="text-gray-600 mb-6">Start by creating a job description to analyze resumes against.</p>
+            <a href="{{ url_for('create_job') }}" 
+               class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i>
+                Create Job Description
+            </a>
+        </div>
+
+        <!-- Quick Upload -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Quick Resume Analysis</h2>
+            <p class="text-gray-600 mb-6">Upload resumes to analyze against existing job descriptions.</p>
+            <button onclick="showUploadModal()" 
+                    class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <i class="fas fa-upload mr-2"></i>
+                Upload Resumes
+            </button>
+        </div>
+    </div>
+
+    <!-- Job Descriptions List -->
+    <div class="bg-white rounded-lg shadow-md">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">Your Job Descriptions</h2>
+        </div>
+        
+        {% if job_descriptions %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Experience Level</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for job in job_descriptions %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ job.title }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500">{{ job.company }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                {{ job.experience_level.title() }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ job.created_at.strftime('%Y-%m-%d') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{{ url_for('job_results', job_id=job.id) }}" 
+                               class="text-blue-600 hover:text-blue-900 mr-4">View Results</a>
+                            <button onclick="uploadResumes({{ job.id }})" 
+                                    class="text-green-600 hover:text-green-900">Upload Resumes</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fas fa-briefcase text-4xl text-gray-400 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Job Descriptions Yet</h3>
+            <p class="text-gray-500 mb-6">Create your first job description to start analyzing resumes.</p>
+            <a href="{{ url_for('create_job') }}" 
+               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i>
+                Create Job Description
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Upload Resumes</h3>
+            <button onclick="hideUploadModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Job Description</label>
+                <select id="jobSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Choose a job description...</option>
+                    {% for job in job_descriptions %}
+                    <option value="{{ job.id }}">{{ job.title }} - {{ job.company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Upload Resume Files (PDF)</label>
+                <input type="file" id="resumeFiles" multiple accept=".pdf" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Select multiple PDF files to upload</p>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="hideUploadModal()" 
+                        class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" id="uploadBtn"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Upload & Analyze
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showUploadModal() {
+    document.getElementById('uploadModal').classList.remove('hidden');
+    document.getElementById('uploadModal').classList.add('flex');
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').classList.add('hidden');
+    document.getElementById('uploadModal').classList.remove('flex');
+}
+
+function uploadResumes(jobId) {
+    document.getElementById('jobSelect').value = jobId;
+    showUploadModal();
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const jobId = document.getElementById('jobSelect').value;
+    const files = document.getElementById('resumeFiles').files;
+    
+    if (!jobId) {
+        showNotification('Please select a job description', 'error');
+        return;
+    }
+    
+    if (files.length === 0) {
+        showNotification('Please select resume files', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('resumes', files[i]);
+    }
+    
+    showLoading('uploadBtn');
+    
+    try {
+        const response = await fetch(`/upload_resumes/${jobId}`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(`Successfully analyzed ${result.results.length} resumes!`);
+            hideUploadModal();
+            setTimeout(() => {
+                window.location.href = `/job_results/${jobId}`;
+            }, 1500);
+        } else {
+            showNotification('Error uploading resumes', 'error');
+        }
+    } catch (error) {
+        showNotification('Error uploading resumes', 'error');
+    } finally {
+        hideLoading('uploadBtn', 'Upload & Analyze');
+    }
+});
+</script>
+{% endblock %}

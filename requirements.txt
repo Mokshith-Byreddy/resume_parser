@@ -1,0 +1,9 @@
+flask
+spacy
+pandas
+plotly
+sklearn
+sentence-transformers
+python-docx
+openpyxl
+PyMuPDF
